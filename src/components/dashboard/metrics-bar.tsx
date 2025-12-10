@@ -57,7 +57,7 @@ export function MetricsBar({ lineItems, profile, events = [], openingBalance = 0
         label="Cash runway" 
         value={metrics.cashRunway ? `${metrics.cashRunway} months` : "N/A"} 
         helper="Months until exhausted"
-        highlight={metrics.cashRunway && metrics.cashRunway > 12}
+        highlight={metrics.cashRunway != null && metrics.cashRunway > 12}
       />
     </div>
   );
