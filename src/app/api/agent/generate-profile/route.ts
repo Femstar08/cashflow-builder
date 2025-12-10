@@ -7,7 +7,8 @@ import type {
   BusinessProfileDraft,
   CashflowAssumptions,
 } from "@/lib/ai/agent-prompt";
-import type { BusinessProfileInsert, HorizonId } from "@/types/database";
+import type { BusinessProfileInsert } from "@/types/database";
+import type { HorizonId } from "@/lib/utils";
 
 const OWNER_PLACEHOLDER = "demo-owner";
 
@@ -48,7 +49,11 @@ export async function POST(request: Request) {
       name: businessProfile.business_name || "Untitled Business",
       industry: businessProfile.industry || null,
       description: businessProfile.business_model || null,
-      entity_type: businessProfile.entity_type === "unknown" ? null : businessProfile.entity_type,
+      entity_type: (businessProfile.entity_type === "unknown" || businessProfile.entity_type === "partnership") 
+        ? null 
+        : (businessProfile.entity_type === "limited_company" || businessProfile.entity_type === "sole_trader" 
+          ? businessProfile.entity_type 
+          : null),
       accounting_basis: businessProfile.tax_settings?.accounting_basis || null,
       vat_enabled: businessProfile.tax_settings?.vat_enabled ?? null,
       vat_basis: businessProfile.tax_settings?.vat_basis || null,
