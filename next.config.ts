@@ -15,15 +15,14 @@ const hasSentryAuth = Boolean(sentryAuthToken);
 
 // Sentry configuration
 // Note: Error tracking works without SENTRY_AUTH_TOKEN (uses DSN).
-// Source map uploads require the auth token. If missing, we skip the wrapper
-// to prevent build failures, but error tracking will still work at runtime.
+// Source map uploads require the auth token. If missing, we completely skip
+// the wrapper to prevent build failures, but error tracking will still work at runtime.
 const sentryConfig = {
   // For all available options, see:
   // https://www.npmjs.com/package/@sentry/webpack-plugin#options
 
-  org: "beacon-ledger",
-
-  project: "javascript-nextjs",
+  org: hasSentryAuth ? "beacon-ledger" : "", // Empty org disables uploads
+  project: hasSentryAuth ? "javascript-nextjs" : "", // Empty project disables uploads
 
   // Only print logs for uploading source maps in CI
   silent: !process.env.CI,
@@ -50,19 +49,16 @@ const sentryConfig = {
   automaticVercelMonitors: true,
 };
 
-// Only apply Sentry source map upload wrapper if auth token is available
-// This prevents build failures when the token is not set in CI/CD
-// Error tracking will still work at runtime using the DSN
+// Warn if token is missing (only in production to avoid noise in dev)
 if (!hasSentryAuth && process.env.NODE_ENV === 'production') {
   console.warn(
-    '⚠️  SENTRY_AUTH_TOKEN not set. Skipping source map uploads. ' +
+    '⚠️  SENTRY_AUTH_TOKEN not set. Source map uploads disabled. ' +
     'Add SENTRY_AUTH_TOKEN to your Vercel environment variables to enable source map uploads. ' +
     'Error tracking will still work without source maps.'
   );
 }
 
-// Conditionally apply Sentry wrapper - only when auth token is available
-// This prevents build failures from missing auth token
-export default hasSentryAuth 
-  ? withSentryConfig(nextConfig, sentryConfig)
-  : nextConfig;
+// Always apply Sentry wrapper, but with empty org/project when token is missing
+// This prevents the plugin from trying to upload source maps
+// Error tracking at runtime still works via DSN in sentry.*.config.ts files
+export default withSentryConfig(nextConfig, sentryConfig);
