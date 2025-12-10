@@ -7,7 +7,7 @@ import { AppShell } from "@/components/layout/app-shell";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useUserStore } from "@/stores/user-store";
-import type { BusinessProfile } from "@/types/database";
+import type { BusinessProfile, LineItem, Event } from "@/types/database";
 import { CashflowChart } from "@/components/dashboard/cashflow-chart";
 import { MetricsBar } from "@/components/dashboard/metrics-bar";
 
@@ -50,6 +50,8 @@ export default function ProfileViewPage() {
   const [profile, setProfile] = useState<BusinessProfile | null>(null);
   const [horizon, setHorizon] = useState<ForecastHorizon>("1Y");
   const [isEditing, setIsEditing] = useState(false);
+  const [lineItems, setLineItems] = useState<LineItem[]>([]);
+  const [events, setEvents] = useState<Event[]>([]);
 
   useEffect(() => {
     if (!user) {
@@ -59,6 +61,11 @@ export default function ProfileViewPage() {
 
     // Load profile - in production, this would be an API call
     setProfile(mockProfile);
+    
+    // TODO: Load lineItems and events from API
+    // For now, using empty arrays
+    setLineItems([]);
+    setEvents([]);
   }, [user, router, params.profileId]);
 
   if (!user || !profile) {
@@ -249,7 +256,12 @@ export default function ProfileViewPage() {
             <Card>
               <h2 className="mb-4 text-xl font-semibold text-[#15213C]">Net Cashflow</h2>
               <div className="h-64">
-                <CashflowChart profileId={profile.id} horizon={horizon} />
+                <CashflowChart 
+                  lineItems={lineItems} 
+                  profile={profile} 
+                  events={events}
+                  openingBalance={0}
+                />
               </div>
             </Card>
 
@@ -263,7 +275,12 @@ export default function ProfileViewPage() {
 
             <Card>
               <h2 className="mb-4 text-xl font-semibold text-[#15213C]">Key Metrics</h2>
-              <MetricsBar profileId={profile.id} horizon={horizon} />
+              <MetricsBar 
+                lineItems={lineItems} 
+                profile={profile} 
+                events={events}
+                openingBalance={0}
+              />
             </Card>
 
             {/* Collaboration Status */}
