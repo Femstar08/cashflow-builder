@@ -1,35 +1,7 @@
 import { NextResponse } from "next/server";
-
-const INSTANT_APP_ID = process.env.NEXT_PUBLIC_INSTANT_APP_ID;
-const INSTANT_ADMIN_TOKEN = process.env.INSTANT_ADMIN_TOKEN;
-
-async function instantRequest(endpoint: string, options: RequestInit = {}) {
-  if (!INSTANT_APP_ID || !INSTANT_ADMIN_TOKEN) {
-    return { data: null };
-  }
-
-  const url = `https://api.instant.dev/v1/${INSTANT_APP_ID}${endpoint}`;
-  try {
-    const response = await fetch(url, {
-      ...options,
-      headers: {
-        "Authorization": `Bearer ${INSTANT_ADMIN_TOKEN}`,
-        "Content-Type": "application/json",
-        ...options.headers,
-      },
-    });
-
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({ message: "Request failed" }));
-      throw new Error(error.message || `HTTP ${response.status}`);
-    }
-
-    return response.json();
-  } catch (error) {
-    console.warn("[InstantDB] Request failed:", error);
-    return { data: null };
-  }
-}
+import { getSupabaseAdmin } from "@/lib/supabase/client";
+import { logger } from "@/lib/logger";
+import { validateUUID } from "@/lib/validation";
 
 type RouteParams = {
   params: Promise<{ documentId: string }>;
@@ -41,6 +13,17 @@ export async function PATCH(request: Request, { params }: RouteParams) {
     const body = await request.json();
     const { tags } = body;
 
+    // Validate inputs
+    try {
+      validateUUID(documentId, 'documentId');
+    } catch (error) {
+      logger.warn('Invalid documentId in tags PATCH', { documentId });
+      return NextResponse.json(
+        { error: "Invalid document ID format" },
+        { status: 400 }
+      );
+    }
+
     if (!Array.isArray(tags)) {
       return NextResponse.json(
         { error: "Tags must be an array" },
@@ -48,22 +31,37 @@ export async function PATCH(request: Request, { params }: RouteParams) {
       );
     }
 
-    // First, get the current document to preserve existing metadata
-    const getResult = await instantRequest("/query", {
-      method: "POST",
-      body: JSON.stringify({
-        query: {
-          profile_documents: {
-            $: { where: { id: documentId } },
-            id: true,
-            metadata: true,
-          },
-        },
-      }),
-    });
+    // Validate tags array
+    if (tags.length > 20) {
+      return NextResponse.json(
+        { error: "Maximum 20 tags allowed" },
+        { status: 400 }
+      );
+    }
 
-    const existingDoc = getResult.data?.profile_documents?.[0];
-    const existingMetadata = existingDoc?.metadata || {};
+    for (const tag of tags) {
+      if (typeof tag !== 'string' || tag.length > 50) {
+        return NextResponse.json(
+          { error: "Each tag must be a string with max 50 characters" },
+          { status: 400 }
+        );
+      }
+    }
+
+    // First, get the current document to preserve existing metadata
+    const admin = getSupabaseAdmin();
+    const { data: existingDoc, error: getError } = await admin
+      .from("cf_profile_documents")
+      .select("metadata")
+      .eq("id", documentId)
+      .single();
+
+    if (getError) {
+      logger.error('Failed to fetch document for tags update', getError, { documentId });
+      throw new Error(`Failed to fetch document: ${getError.message}`);
+    }
+
+    const existingMetadata = (existingDoc?.metadata as Record<string, unknown>) || {};
 
     // Update metadata with tags
     const updatedMetadata = {
@@ -72,26 +70,22 @@ export async function PATCH(request: Request, { params }: RouteParams) {
     };
 
     // Update the document
-    await instantRequest("/transact", {
-      method: "POST",
-      body: JSON.stringify({
-        operations: [
-          {
-            type: "update",
-            table: "profile_documents",
-            id: documentId,
-            data: {
-              metadata: updatedMetadata,
-              updated_at: new Date().toISOString(),
-            },
-          },
-        ],
-      }),
-    });
+    const { error: updateError } = await admin
+      .from("cf_profile_documents")
+      .update({
+        metadata: updatedMetadata,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", documentId);
+
+    if (updateError) {
+      logger.error('Failed to update document tags', updateError, { documentId });
+      throw new Error(`Failed to update document: ${updateError.message}`);
+    }
 
     return NextResponse.json({ success: true, tags });
   } catch (error) {
-    console.error("Error updating document tags:", error);
+    logger.error("Error updating document tags", error);
     return NextResponse.json(
       {
         error: "Failed to update document tags",

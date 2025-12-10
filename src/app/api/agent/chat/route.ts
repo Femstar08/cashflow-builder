@@ -9,6 +9,8 @@ import {
   type BusinessProfileDraft,
   type CashflowAssumptions,
 } from "@/lib/ai/agent-prompt";
+import { logger } from "@/lib/logger";
+import { validateUUID, validateString } from "@/lib/validation";
 
 type ChatMessage = {
   role: "user" | "assistant";
@@ -50,8 +52,46 @@ export async function POST(request: Request) {
       userRole = "client",
     } = body;
 
+    // Validate inputs
+    if (profileId) {
+      try {
+        validateUUID(profileId, 'profileId');
+      } catch (error) {
+        logger.warn('Invalid profileId in agent chat', { profileId });
+        return NextResponse.json(
+          { error: "Invalid profile ID format" },
+          { status: 400 }
+        );
+      }
+    }
+
+    if (userId) {
+      try {
+        validateUUID(userId, 'userId');
+      } catch (error) {
+        logger.warn('Invalid userId in agent chat', { userId });
+        return NextResponse.json(
+          { error: "Invalid user ID format" },
+          { status: 400 }
+        );
+      }
+    }
+
+    if (message) {
+      try {
+        validateString(message, { fieldName: 'message', minLength: 1, maxLength: 10000 });
+      } catch (error) {
+        logger.warn('Invalid message in agent chat', { messageLength: message.length });
+        return NextResponse.json(
+          { error: (error as Error).message },
+          { status: 400 }
+        );
+      }
+    }
+
     const openai = getOpenAIClient();
     if (!openai) {
+      logger.warn('OpenAI client not configured');
       return NextResponse.json(
         {
           response: "AI service is not configured. Please set OPENAI_API_KEY in your environment variables.",
@@ -81,7 +121,7 @@ export async function POST(request: Request) {
             assumptionsList = assumptions.slice(0, 5).map((a: any) => a.assumption);
           }
         } catch (error) {
-          console.error("Error fetching assumptions for greeting:", error);
+          logger.error("Error fetching assumptions for greeting", error, { profileId });
         }
         
         // Build contextual greeting based on existing profile
@@ -177,7 +217,7 @@ export async function POST(request: Request) {
           }
         }
       } catch (error) {
-        console.error("Error fetching stored context:", error);
+        logger.error("Error fetching stored context", error, { profileId });
         // Continue even if fetch fails
       }
     }
@@ -233,7 +273,7 @@ export async function POST(request: Request) {
               storedDocumentIds = storeData.documents?.map((d: any) => d.id) || [];
             }
           } catch (storeError) {
-            console.error("Error storing documents:", storeError);
+            logger.error("Error storing documents", storeError, { profileId, userId });
             // Continue even if storage fails
           }
         }
@@ -260,7 +300,11 @@ export async function POST(request: Request) {
         }
         userMessageContent += fileContent;
       } catch (error) {
-        console.error("Error processing files:", error);
+        logger.error("Error processing files", error, { 
+          profileId, 
+          fileCount: attachments.length,
+          fileNames: attachments.map(f => f.name)
+        });
         const fileList = attachments.map((file) => `- ${file.name} (${file.type})`).join("\n");
         userMessageContent += `\n\n[User attached ${attachments.length} file(s), but encountered an error processing them:\n${fileList}\nPlease provide a summary of the key information from these files.]`;
       }
@@ -300,12 +344,12 @@ export async function POST(request: Request) {
               createdBy: userId || "agent",
             }),
           }).catch((error) => {
-            console.error("Error storing assumption:", error);
+            logger.error("Error storing assumption", error, { profileId, assumption: assumption.assumption });
             // Continue even if storage fails
           });
         }
       } catch (error) {
-        console.error("Error storing assumptions:", error);
+        logger.error("Error storing assumptions", error, { profileId, assumptionCount: parsed.assumptions.length });
         // Continue even if storage fails
       }
     }
@@ -336,7 +380,12 @@ export async function POST(request: Request) {
       stage: nextStage,
     });
   } catch (error) {
-    console.error("Agent chat error:", error);
+    logger.error("Agent chat error", error, { 
+      profileId, 
+      userId, 
+      stage,
+      hasAttachments: attachments.length > 0
+    });
     
     const errorMessage = (error as Error).message || "Failed to generate agent response";
     const isModelAccessError = errorMessage.includes("does not have access to model") || 

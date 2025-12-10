@@ -21,8 +21,8 @@ type FormState = {
 };
 
 const OWNER_PLACEHOLDER = "demo-owner";
-const INSTANTDB_CONFIGURED =
-  Boolean(process.env.NEXT_PUBLIC_INSTANT_APP_ID) && Boolean(process.env.INSTANT_ADMIN_TOKEN);
+const SUPABASE_CONFIGURED =
+  Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL) && Boolean(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
 
 type Step = 1 | 2 | 3 | 4;
 
@@ -99,7 +99,7 @@ export function GuidedProfileWizard() {
           revenue_model: formState.revenue_model,
           notes: formState.notes,
           raw_profile_json: { recommendations },
-          simulate: !INSTANTDB_CONFIGURED,
+          simulate: !SUPABASE_CONFIGURED,
         });
 
         setSavedProfileId(data.id);

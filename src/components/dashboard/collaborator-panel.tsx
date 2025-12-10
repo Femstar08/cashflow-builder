@@ -30,7 +30,7 @@ export function CollaboratorPanel({ initialCollaborators = [], profileName }: Co
     setCollaborators((prev) => [...prev, { email, role, status: "pending" }]);
     setEmail("");
     setRole("");
-    setMessage(`Invitation queued for ${email}. (Stubbed – connect InstantDB function later)`);
+    setMessage(`Invitation queued for ${email}. (Stubbed – connect Supabase function later)`);
   };
 
   return (

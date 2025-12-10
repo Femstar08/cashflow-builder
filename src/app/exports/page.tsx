@@ -30,7 +30,7 @@ export default function ExportsPage() {
               </li>
             ))}
           </ul>
-          <p className="mt-4 text-xs text-neutral-400">Exports currently use mock data when InstantDB creds are missing.</p>
+          <p className="mt-4 text-xs text-neutral-400">Exports currently use mock data when Supabase creds are missing.</p>
         </Card>
       </div>
     </AppShell>

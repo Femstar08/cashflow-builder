@@ -136,7 +136,7 @@ export function DocumentsPanel({
     }
     
     // Infer tags from filename
-    const name = doc.file_name.toLowerCase();
+    const name = doc.name.toLowerCase();
     const inferredTags: string[] = [];
     if (name.includes("plan") || name.includes("business plan")) inferredTags.push("Business plan");
     if (name.includes("pricing") || name.includes("price")) inferredTags.push("Pricing");

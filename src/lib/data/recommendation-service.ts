@@ -1,11 +1,11 @@
-import * as instantService from "@/lib/instantdb/service";
+import * as supabaseService from "@/lib/supabase/service";
 import type { AiRecommendation, AiRecommendationInsert, UUID } from "@/types/database";
 
 export async function listRecommendations(scenarioId: UUID): Promise<AiRecommendation[]> {
-  return instantService.listRecommendations(scenarioId);
+  return supabaseService.listRecommendations(scenarioId);
 }
 
 export async function createRecommendation(payload: AiRecommendationInsert): Promise<AiRecommendation> {
-  return instantService.createRecommendation(payload);
+  return supabaseService.createRecommendation(payload);
 }
 

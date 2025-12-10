@@ -20,8 +20,8 @@ type FormState = {
 };
 
 const OWNER_PLACEHOLDER = "demo-owner";
-const INSTANTDB_CONFIGURED =
-  Boolean(process.env.NEXT_PUBLIC_INSTANT_APP_ID) && Boolean(process.env.INSTANT_ADMIN_TOKEN);
+const SUPABASE_CONFIGURED =
+  Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL) && Boolean(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
 
 export function ProfileIntakeForm() {
   const [step, setStep] = useState<1 | 2>(1);
@@ -93,10 +93,10 @@ export function ProfileIntakeForm() {
           revenue_model: formState.revenue_model,
           notes: formState.notes,
           raw_profile_json: { recommendations },
-          simulate: !INSTANTDB_CONFIGURED,
+          simulate: !SUPABASE_CONFIGURED,
         });
 
-        setMessage(simulated ? "Draft saved locally (InstantDB env not set)." : `Profile ${data.name} saved.`);
+        setMessage(simulated ? "Draft saved locally (Supabase env not set)." : `Profile ${data.name} saved.`);
       } catch (error) {
         setMessage((error as Error).message);
       }
@@ -172,7 +172,7 @@ export function ProfileIntakeForm() {
         <>
           <Card
             title="Step 2 · Review AI draft"
-            description="Modify any field before persisting to InstantDB."
+            description="Modify any field before persisting to Supabase."
             actions={
               <div className="flex items-center gap-3">
                 <Button type="button" variant="ghost" disabled={isPending} onClick={handleRegenerate}>

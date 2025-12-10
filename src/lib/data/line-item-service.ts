@@ -1,15 +1,15 @@
-import * as instantService from "@/lib/instantdb/service";
+import * as supabaseService from "@/lib/supabase/service";
 import type { LineItem, LineItemInsert, UUID } from "@/types/database";
 
 export async function listLineItems(scenarioId: UUID): Promise<LineItem[]> {
-  return instantService.listLineItems(scenarioId);
+  return supabaseService.listLineItems(scenarioId);
 }
 
 export async function createLineItem(payload: LineItemInsert): Promise<LineItem> {
-  return instantService.createLineItem(payload);
+  return supabaseService.createLineItem(payload);
 }
 
 export async function deleteLineItem(id: UUID): Promise<void> {
-  return instantService.deleteLineItem(id);
+  return supabaseService.deleteLineItem(id);
 }
 

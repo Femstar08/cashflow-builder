@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import type { SMARTGoal } from "@/components/goals/smart-goals-panel";
 
-// In a real app, this would use InstantDB
+// In a real app, this would use Supabase
 // For now, we'll use a simple in-memory store
 const goalsStore = new Map<string, SMARTGoal[]>();
 

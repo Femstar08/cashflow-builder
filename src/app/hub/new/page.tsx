@@ -26,34 +26,38 @@ export default function NewProfilePage() {
           </div>
 
           <div className="grid gap-6 md:grid-cols-2">
-            <Card
+            <div
               className="cursor-pointer transition-shadow hover:shadow-md"
               onClick={() => setMode("ai")}
             >
-              <div className="p-8 text-center">
-                <h2 className="mb-2 text-xl font-semibold text-[#15213C]">Guided Builder</h2>
-                <p className="mb-6 text-[#5C6478]">
-                  I'll guide you through creating a comprehensive business profile with intelligent
-                  questions and suggestions.
-                </p>
-                <Button className="w-full">Start Guided Builder</Button>
-              </div>
-            </Card>
+              <Card>
+                <div className="p-8 text-center">
+                  <h2 className="mb-2 text-xl font-semibold text-[#15213C]">Guided Builder</h2>
+                  <p className="mb-6 text-[#5C6478]">
+                    I'll guide you through creating a comprehensive business profile with intelligent
+                    questions and suggestions.
+                  </p>
+                  <Button className="w-full">Start Guided Builder</Button>
+                </div>
+              </Card>
+            </div>
 
-            <Card
+            <div
               className="cursor-pointer transition-shadow hover:shadow-md"
               onClick={() => setMode("manual")}
             >
-              <div className="p-8 text-center">
-                <h2 className="mb-2 text-xl font-semibold text-[#15213C]">Enter Manually</h2>
-                <p className="mb-6 text-[#5C6478]">
-                  Fill out the profile form yourself with full control over every detail.
-                </p>
-                <Button variant="outline" className="w-full">
-                  Start Manual Entry
-                </Button>
-              </div>
-            </Card>
+              <Card>
+                <div className="p-8 text-center">
+                  <h2 className="mb-2 text-xl font-semibold text-[#15213C]">Enter Manually</h2>
+                  <p className="mb-6 text-[#5C6478]">
+                    Fill out the profile form yourself with full control over every detail.
+                  </p>
+                  <Button variant="outline" className="w-full">
+                    Start Manual Entry
+                  </Button>
+                </div>
+              </Card>
+            </div>
           </div>
         </div>
       </AppShell>

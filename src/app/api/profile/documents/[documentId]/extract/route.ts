@@ -1,35 +1,7 @@
 import { NextResponse } from "next/server";
-
-const INSTANT_APP_ID = process.env.NEXT_PUBLIC_INSTANT_APP_ID;
-const INSTANT_ADMIN_TOKEN = process.env.INSTANT_ADMIN_TOKEN;
-
-async function instantRequest(endpoint: string, options: RequestInit = {}) {
-  if (!INSTANT_APP_ID || !INSTANT_ADMIN_TOKEN) {
-    return { data: null };
-  }
-
-  const url = `https://api.instant.dev/v1/${INSTANT_APP_ID}${endpoint}`;
-  try {
-    const response = await fetch(url, {
-      ...options,
-      headers: {
-        "Authorization": `Bearer ${INSTANT_ADMIN_TOKEN}`,
-        "Content-Type": "application/json",
-        ...options.headers,
-      },
-    });
-
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({ message: "Request failed" }));
-      throw new Error(error.message || `HTTP ${response.status}`);
-    }
-
-    return response.json();
-  } catch (error) {
-    console.warn("[InstantDB] Request failed:", error);
-    return { data: null };
-  }
-}
+import { getSupabaseAdmin } from "@/lib/supabase/client";
+import { logger } from "@/lib/logger";
+import { validateUUID } from "@/lib/validation";
 
 type RouteParams = {
   params: Promise<{ documentId: string }>;
@@ -38,27 +10,43 @@ type RouteParams = {
 export async function POST(request: Request, { params }: RouteParams) {
   try {
     const { documentId } = await params;
+    
+    // Validate documentId
+    try {
+      validateUUID(documentId, 'documentId');
+    } catch (error) {
+      logger.warn('Invalid documentId in extract POST', { documentId });
+      return NextResponse.json(
+        { error: "Invalid document ID format" },
+        { status: 400 }
+      );
+    }
+
     const body = await request.json();
     const { tags, extractedEvents, profileId } = body;
 
-    // Get document info
-    const getResult = await instantRequest("/query", {
-      method: "POST",
-      body: JSON.stringify({
-        query: {
-          profile_documents: {
-            $: { where: { id: documentId } },
-            id: true,
-            profile_id: true,
-            file_name: true,
-            metadata: true,
-          },
-        },
-      }),
-    });
+    // Validate profileId if provided
+    if (profileId) {
+      try {
+        validateUUID(profileId, 'profileId');
+      } catch (error) {
+        logger.warn('Invalid profileId in extract POST', { profileId });
+        return NextResponse.json(
+          { error: "Invalid profile ID format" },
+          { status: 400 }
+        );
+      }
+    }
 
-    const doc = getResult.data?.profile_documents?.[0];
-    if (!doc) {
+    // Get document info
+    const admin = getSupabaseAdmin();
+    const { data: doc, error: getError } = await admin
+      .from("cf_profile_documents")
+      .select("id, profile_id, file_name, metadata")
+      .eq("id", documentId)
+      .single();
+
+    if (getError || !doc) {
       return NextResponse.json(
         { error: "Document not found" },
         { status: 404 }
@@ -69,28 +57,23 @@ export async function POST(request: Request, { params }: RouteParams) {
 
     // Update document tags if provided
     if (tags && Array.isArray(tags)) {
-      const existingMetadata = doc.metadata || {};
+      const existingMetadata = (doc.metadata as Record<string, unknown>) || {};
       const updatedMetadata = {
         ...existingMetadata,
         tags,
       };
 
-      await instantRequest("/transact", {
-        method: "POST",
-        body: JSON.stringify({
-          operations: [
-            {
-              type: "update",
-              table: "profile_documents",
-              id: documentId,
-              data: {
-                metadata: updatedMetadata,
-                updated_at: new Date().toISOString(),
-              },
-            },
-          ],
-        }),
-      });
+      const { error: updateError } = await admin
+        .from("cf_profile_documents")
+        .update({
+          metadata: updatedMetadata,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", documentId);
+
+      if (updateError) {
+        logger.error("Error updating document tags", updateError, { documentId });
+      }
     }
 
     // Create activity log entry for extraction
@@ -103,38 +86,32 @@ export async function POST(request: Request, { params }: RouteParams) {
         return `Event: ${e.name || "Unknown"} (Month ${e.month})`;
       }).join(", ");
 
-      await instantRequest("/transact", {
-        method: "POST",
-        body: JSON.stringify({
-          operations: [
-            {
-              type: "insert",
-              table: "profile_activities",
-              data: {
-                id: crypto.randomUUID(),
-                profile_id: docProfileId,
-                user_id: "system", // Agent extraction
-                activity_type: "document_extracted",
-                description: `Agent extracted ${extractedEvents.length} event(s) from '${doc.file_name}': ${eventDescriptions}`,
-                metadata: {
-                  document_id: documentId,
-                  document_name: doc.file_name,
-                  extracted_events: extractedEvents,
-                  tags: tags || [],
-                },
-                created_at: new Date().toISOString(),
+      (async () => {
+        try {
+          await admin
+            .from("cf_profile_activities")
+            .insert({
+              id: crypto.randomUUID(),
+              profile_id: docProfileId,
+              user_id: "system", // Agent extraction
+              activity_type: "document_extracted",
+              description: `Agent extracted ${extractedEvents.length} event(s) from '${doc.file_name}': ${eventDescriptions}`,
+              metadata: {
+                document_id: documentId,
+                document_name: doc.file_name,
+                extracted_events: extractedEvents,
+                tags: tags || [],
               },
-            },
-          ],
-        }),
-      }).catch((error) => {
-        console.error("Error creating activity log:", error);
-      });
+            });
+        } catch (error: unknown) {
+          logger.error("Error creating activity log", error, { documentId, profileId: docProfileId });
+        }
+      })();
     }
 
     return NextResponse.json({ success: true, tags, extractedEvents });
   } catch (error) {
-    console.error("Error processing document extraction:", error);
+    logger.error("Error processing document extraction", error);
     return NextResponse.json(
       {
         error: "Failed to process document extraction",

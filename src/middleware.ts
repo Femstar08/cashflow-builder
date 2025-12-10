@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
+import { apiRateLimiter, getClientIdentifier } from "@/lib/rate-limit";
 
 /**
- * Internal-only access control middleware
+ * Internal-only access control middleware with rate limiting
  * 
  * Note: Next.js 16 with Turbopack may show a deprecation warning about using "proxy" instead.
  * This is a known Turbopack quirk - middleware.ts is still the correct and supported way
@@ -10,6 +11,31 @@ import type { NextRequest } from "next/server";
  */
 export function middleware(request: NextRequest) {
   const isInternalOnly = process.env.INTERNAL_ONLY_MODE === "true";
+
+  // Apply rate limiting to API routes
+  if (request.nextUrl.pathname.startsWith('/api/')) {
+    const identifier = getClientIdentifier(request);
+    const result = apiRateLimiter.check(identifier);
+
+    if (!result.allowed) {
+      return NextResponse.json(
+        {
+          error: 'Too many requests',
+          message: 'Rate limit exceeded. Please try again later.',
+          retryAfter: Math.ceil((result.resetTime - Date.now()) / 1000),
+        },
+        {
+          status: 429,
+          headers: {
+            'Retry-After': Math.ceil((result.resetTime - Date.now()) / 1000).toString(),
+            'X-RateLimit-Limit': '60',
+            'X-RateLimit-Remaining': result.remaining.toString(),
+            'X-RateLimit-Reset': result.resetTime.toString(),
+          },
+        }
+      );
+    }
+  }
 
   // Allow static assets, API routes, and public pages
   if (

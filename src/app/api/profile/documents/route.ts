@@ -1,37 +1,10 @@
 import { NextResponse } from "next/server";
 import { processFiles } from "@/lib/ai/file-processor";
-
-const INSTANT_APP_ID = process.env.NEXT_PUBLIC_INSTANT_APP_ID;
-const INSTANT_ADMIN_TOKEN = process.env.INSTANT_ADMIN_TOKEN;
-
-async function instantRequest(endpoint: string, options: RequestInit = {}) {
-  if (!INSTANT_APP_ID || !INSTANT_ADMIN_TOKEN) {
-    return { data: null };
-  }
-
-  // InstantDB REST API endpoint (adjust based on actual InstantDB API docs)
-  const url = `https://api.instant.dev/v1/${INSTANT_APP_ID}${endpoint}`;
-  try {
-    const response = await fetch(url, {
-      ...options,
-      headers: {
-        "Authorization": `Bearer ${INSTANT_ADMIN_TOKEN}`,
-        "Content-Type": "application/json",
-        ...options.headers,
-      },
-    });
-
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({ message: "Request failed" }));
-      throw new Error(error.message || `HTTP ${response.status}`);
-    }
-
-    return response.json();
-  } catch (error) {
-    console.warn("[InstantDB] Request failed:", error);
-    return { data: null };
-  }
-}
+import { getSupabaseAdmin } from "@/lib/supabase/client";
+import type { ProfileDocumentInsert } from "@/types/database";
+import { logger } from "@/lib/logger";
+import { validateUUID, validateFileName, validateFileType, validateFileSize } from "@/lib/validation";
+import { getCacheHeaders } from "@/lib/cache";
 
 type DocumentUploadRequest = {
   profileId: string;
@@ -49,6 +22,7 @@ export async function POST(request: Request) {
     const body: DocumentUploadRequest = await request.json();
     const { profileId, files, uploadedBy, uploadedByRole } = body;
 
+    // Validate input
     if (!profileId || !files || files.length === 0) {
       return NextResponse.json(
         { error: "Profile ID and files are required" },
@@ -56,18 +30,79 @@ export async function POST(request: Request) {
       );
     }
 
+    // Validate profileId is a valid UUID
+    try {
+      validateUUID(profileId, 'profileId');
+    } catch (error) {
+      logger.warn('Invalid profileId in document upload', { profileId });
+      return NextResponse.json(
+        { error: "Invalid profile ID format" },
+        { status: 400 }
+      );
+    }
+
+    // Validate file count limit
+    if (files.length > 10) {
+      return NextResponse.json(
+        { error: "Maximum 10 files allowed per upload" },
+        { status: 400 }
+      );
+    }
+
     // Process files to extract text
     const processedFiles = await processFiles(files);
+
+    // Allowed file types
+    const allowedTypes = [
+      'application/pdf',
+      'application/msword',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'text/plain',
+      'text/csv',
+      'application/vnd.ms-excel',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'image/png',
+      'image/jpeg',
+      'image/jpg',
+    ];
+
+    const maxFileSize = 10 * 1024 * 1024; // 10MB
 
     // Store documents in database
     const documents = await Promise.all(
       processedFiles.map(async (processedFile, index) => {
         const file = files[index];
+        
+        // Validate file name
+        let fileName: string;
+        try {
+          fileName = validateFileName(file.name);
+        } catch (error) {
+          logger.warn('Invalid file name', { fileName: file.name });
+          throw new Error(`Invalid file name: ${file.name}`);
+        }
+
+        // Validate file type
+        try {
+          validateFileType(file.type, allowedTypes);
+        } catch (error) {
+          logger.warn('Invalid file type', { fileType: file.type, fileName: file.name });
+          throw new Error(`File type ${file.type} is not allowed`);
+        }
+
         const base64Data = file.content.includes(",")
           ? file.content.split(",")[1]
           : file.content;
         const buffer = Buffer.from(base64Data, "base64");
         const fileSize = buffer.length;
+
+        // Validate file size
+        try {
+          validateFileSize(fileSize, maxFileSize);
+        } catch (error) {
+          logger.warn('File size exceeded', { fileSize, fileName: file.name });
+          throw error;
+        }
 
         // For large files, we'd store in external storage (S3, etc.)
         // For now, store base64 for files under 5MB
@@ -77,7 +112,7 @@ export async function POST(request: Request) {
           profile_id: profileId,
           uploaded_by: uploadedBy,
           uploaded_by_role: uploadedByRole,
-          file_name: processedFile.name,
+          file_name: fileName, // Use validated file name
           file_type: processedFile.type,
           file_size: fileSize,
           file_content_base64: shouldStoreBase64 ? base64Data : undefined,
@@ -90,57 +125,50 @@ export async function POST(request: Request) {
         };
 
         // Insert into database
-        const documentId = crypto.randomUUID();
-        const result = await instantRequest("/transact", {
-          method: "POST",
-          body: JSON.stringify({
-            operations: [
-              {
-                type: "insert",
-                table: "profile_documents",
-                data: {
-                  ...documentData,
-                  id: documentId,
-                },
-              },
-            ],
-          }),
-        });
+        const admin = getSupabaseAdmin();
+        const { data: insertedDoc, error: insertError } = await admin
+          .from("cf_profile_documents")
+          .insert({
+            ...documentData,
+            id: crypto.randomUUID(),
+          } as ProfileDocumentInsert)
+          .select()
+          .single();
+
+        if (insertError) {
+          logger.error('Failed to insert document', insertError, { profileId, fileName });
+          throw new Error(`Failed to insert document: ${insertError.message}`);
+        }
 
         return {
-          id: documentId,
+          id: insertedDoc.id,
           ...documentData,
         };
       })
     );
 
     // Create activity log entry (non-blocking)
-    instantRequest("/transact", {
-      method: "POST",
-      body: JSON.stringify({
-        operations: [
-          {
-            type: "insert",
-            table: "profile_activities",
-            data: {
-              id: crypto.randomUUID(),
-              profile_id: profileId,
-              user_id: uploadedBy,
-              activity_type: "document_uploaded",
-              description: `Uploaded ${files.length} document(s): ${files.map((f) => f.name).join(", ")}`,
-              metadata: {
-                document_count: files.length,
-                file_names: files.map((f) => f.name),
-              },
-              created_at: new Date().toISOString(),
+    const admin = getSupabaseAdmin();
+    (async () => {
+      try {
+        await admin
+          .from("cf_profile_activities")
+          .insert({
+            id: crypto.randomUUID(),
+            profile_id: profileId,
+            user_id: uploadedBy,
+            activity_type: "document_uploaded",
+            description: `Uploaded ${files.length} document(s): ${files.map((f) => f.name).join(", ")}`,
+            metadata: {
+              document_count: files.length,
+              file_names: files.map((f) => f.name),
             },
-          },
-        ],
-      }),
-    }).catch((error) => {
-      console.error("Error creating activity log:", error);
-      // Don't fail the request if activity log fails
-    });
+          });
+      } catch (error: unknown) {
+        logger.error("Error creating activity log", error, { profileId });
+        // Don't fail the request if activity log fails
+      }
+    })();
 
     return NextResponse.json({
       success: true,
@@ -153,7 +181,7 @@ export async function POST(request: Request) {
       })),
     });
   } catch (error) {
-    console.error("Error uploading documents:", error);
+    logger.error("Error uploading documents", error);
     return NextResponse.json(
       {
         error: "Failed to upload documents",
@@ -177,33 +205,20 @@ export async function GET(request: Request) {
     }
 
     // Fetch documents for the profile
-    const result = await instantRequest("/query", {
-      method: "POST",
-      body: JSON.stringify({
-        query: {
-          profile_documents: {
-            $: {
-              where: {
-                profile_id: profileId,
-                is_deleted: { $ne: true },
-              },
-            },
-            id: true,
-            file_name: true,
-            file_type: true,
-            file_size: true,
-            extracted_text: true,
-            extraction_notes: true,
-            uploaded_by: true,
-            uploaded_by_role: true,
-            created_at: true,
-            metadata: true,
-          },
-        },
-      }),
-    });
+    const admin = getSupabaseAdmin();
+    const { data: documentsData, error } = await admin
+      .from("cf_profile_documents")
+      .select("*")
+      .eq("profile_id", profileId)
+      .eq("is_deleted", false)
+      .order("created_at", { ascending: false });
 
-    const documents = (result.data?.profile_documents || []).map((doc: any) => ({
+    if (error) {
+      logger.error('Failed to fetch documents', error, { profileId });
+      throw new Error(`Failed to fetch documents: ${error.message}`);
+    }
+
+    const documents = (documentsData || []).map((doc: any) => ({
       id: doc.id,
       name: doc.file_name,
       type: doc.file_type,
@@ -216,9 +231,12 @@ export async function GET(request: Request) {
       metadata: doc.metadata,
     }));
 
-    return NextResponse.json({ documents });
+    return NextResponse.json(
+      { documents },
+      { headers: getCacheHeaders(60) } // Cache for 60 seconds
+    );
   } catch (error) {
-    console.error("Error fetching documents:", error);
+    logger.error("Error fetching documents", error);
     return NextResponse.json(
       {
         error: "Failed to fetch documents",

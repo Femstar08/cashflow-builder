@@ -1,35 +1,9 @@
 import { NextResponse } from "next/server";
-
-const INSTANT_APP_ID = process.env.NEXT_PUBLIC_INSTANT_APP_ID;
-const INSTANT_ADMIN_TOKEN = process.env.INSTANT_ADMIN_TOKEN;
-
-async function instantRequest(endpoint: string, options: RequestInit = {}) {
-  if (!INSTANT_APP_ID || !INSTANT_ADMIN_TOKEN) {
-    return { data: null };
-  }
-
-  const url = `https://api.instant.dev/v1/${INSTANT_APP_ID}${endpoint}`;
-  try {
-    const response = await fetch(url, {
-      ...options,
-      headers: {
-        "Authorization": `Bearer ${INSTANT_ADMIN_TOKEN}`,
-        "Content-Type": "application/json",
-        ...options.headers,
-      },
-    });
-
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({ message: "Request failed" }));
-      throw new Error(error.message || `HTTP ${response.status}`);
-    }
-
-    return response.json();
-  } catch (error) {
-    console.warn("[InstantDB] Request failed:", error);
-    return { data: null };
-  }
-}
+import { getSupabaseAdmin } from "@/lib/supabase/client";
+import type { ProfileAssumptionInsert } from "@/types/database";
+import { logger } from "@/lib/logger";
+import { validateUUID, validateString } from "@/lib/validation";
+import { getCacheHeaders } from "@/lib/cache";
 
 export async function GET(request: Request) {
   try {
@@ -44,34 +18,45 @@ export async function GET(request: Request) {
       );
     }
 
-    // Fetch assumptions for the profile
-    const result = await instantRequest("/query", {
-      method: "POST",
-      body: JSON.stringify({
-        query: {
-          profile_assumptions: {
-            $: {
-              where: {
-                profile_id: profileId,
-                ...(status === "active" ? { status: { $ne: "superseded" } } : {}),
-              },
-              orderBy: { created_at: "desc" },
-            },
-            id: true,
-            profile_id: true,
-            assumption: true,
-            reason: true,
-            category: true,
-            status: true,
-            updated_by_assumption_id: true,
-            created_at: true,
-            created_by: true,
-          },
-        },
-      }),
-    });
+    // Validate profileId is a valid UUID
+    try {
+      validateUUID(profileId, 'profileId');
+    } catch (error) {
+      logger.warn('Invalid profileId in assumptions GET', { profileId });
+      return NextResponse.json(
+        { error: "Invalid profile ID format" },
+        { status: 400 }
+      );
+    }
 
-    const assumptions = (result.data?.profile_assumptions || []).map((assumption: any) => ({
+    // Validate status parameter if provided
+    if (status && status !== "active" && status !== "all") {
+      return NextResponse.json(
+        { error: "Status must be 'active' or 'all'" },
+        { status: 400 }
+      );
+    }
+
+    // Fetch assumptions for the profile
+    const admin = getSupabaseAdmin();
+    let query = admin
+      .from("cf_profile_assumptions")
+      .select("*")
+      .eq("profile_id", profileId)
+      .order("created_at", { ascending: false });
+
+    if (status === "active") {
+      query = query.neq("status", "superseded");
+    }
+
+    const { data: assumptionsData, error } = await query;
+
+    if (error) {
+      logger.error('Failed to fetch assumptions', error, { profileId, status });
+      throw new Error(`Failed to fetch assumptions: ${error.message}`);
+    }
+
+    const assumptions = (assumptionsData || []).map((assumption: any) => ({
       id: assumption.id,
       profile_id: assumption.profile_id,
       assumption: assumption.assumption,
@@ -83,9 +68,12 @@ export async function GET(request: Request) {
       created_by: assumption.created_by,
     }));
 
-    return NextResponse.json({ assumptions });
+    return NextResponse.json(
+      { assumptions },
+      { headers: getCacheHeaders(60) } // Cache for 60 seconds
+    );
   } catch (error) {
-    console.error("Error fetching assumptions:", error);
+    logger.error("Error fetching assumptions", error);
     return NextResponse.json(
       {
         error: "Failed to fetch assumptions",
@@ -108,57 +96,81 @@ export async function POST(request: Request) {
       );
     }
 
+    // Validate inputs
+    try {
+      validateUUID(profileId, 'profileId');
+      validateString(assumption, { 
+        fieldName: 'assumption', 
+        minLength: 1, 
+        maxLength: 1000 
+      });
+      if (reason) {
+        validateString(reason, { 
+          fieldName: 'reason', 
+          minLength: 1, 
+          maxLength: 500,
+          required: false 
+        });
+      }
+      if (category) {
+        validateString(category, { 
+          fieldName: 'category', 
+          minLength: 1, 
+          maxLength: 50,
+          required: false 
+        });
+      }
+    } catch (error) {
+      logger.warn('Invalid input in assumptions POST', { profileId, error });
+      return NextResponse.json(
+        { error: (error as Error).message },
+        { status: 400 }
+      );
+    }
+
     const assumptionId = crypto.randomUUID();
+    const admin = getSupabaseAdmin();
 
     // Insert assumption
-    await instantRequest("/transact", {
-      method: "POST",
-      body: JSON.stringify({
-        operations: [
-          {
-            type: "insert",
-            table: "profile_assumptions",
-            data: {
-              id: assumptionId,
-              profile_id: profileId,
-              assumption,
-              reason: reason || undefined,
-              category: category || undefined,
-              status: "active",
-              created_at: new Date().toISOString(),
-              created_by: createdBy || "agent",
-            },
-          },
-        ],
-      }),
-    });
+    const { data: insertedAssumption, error: insertError } = await admin
+      .from("cf_profile_assumptions")
+      .insert({
+        id: assumptionId,
+        profile_id: profileId,
+        assumption,
+        reason: reason || null,
+        category: category || null,
+        status: "active",
+        created_by: createdBy || "agent",
+      } as ProfileAssumptionInsert)
+      .select()
+      .single();
+
+    if (insertError) {
+      logger.error('Failed to insert assumption', insertError, { profileId, assumptionId });
+      throw new Error(`Failed to insert assumption: ${insertError.message}`);
+    }
 
     // Create activity log entry
-    await instantRequest("/transact", {
-      method: "POST",
-      body: JSON.stringify({
-        operations: [
-          {
-            type: "insert",
-            table: "profile_activities",
-            data: {
-              id: crypto.randomUUID(),
-              profile_id: profileId,
-              user_id: createdBy || "system",
-              activity_type: "assumption_added",
-              description: `Assumption added: ${assumption}`,
-              metadata: {
-                assumption_id: assumptionId,
-                category: category || "other",
-              },
-              created_at: new Date().toISOString(),
+    (async () => {
+      try {
+        await admin
+          .from("cf_profile_activities")
+          .insert({
+            id: crypto.randomUUID(),
+            profile_id: profileId,
+            user_id: createdBy || "system",
+            activity_type: "assumption_added",
+            description: `Assumption added: ${assumption}`,
+            metadata: {
+              assumption_id: assumptionId,
+              category: category || "other",
             },
-          },
-        ],
-      }),
-    }).catch((error) => {
-      console.error("Error creating activity log:", error);
-    });
+          });
+      } catch (error: unknown) {
+        logger.error("Error creating activity log", error, { profileId, assumptionId });
+      }
+    })();
 
     return NextResponse.json({
       success: true,
@@ -174,7 +186,7 @@ export async function POST(request: Request) {
       },
     });
   } catch (error) {
-    console.error("Error creating assumption:", error);
+    logger.error("Error creating assumption", error);
     return NextResponse.json(
       {
         error: "Failed to create assumption",
@@ -197,27 +209,42 @@ export async function PATCH(request: Request) {
       );
     }
 
+    // Validate inputs
+    try {
+      validateUUID(assumptionId, 'assumptionId');
+      const validStatuses = ['active', 'updated', 'superseded'];
+      if (!validStatuses.includes(status)) {
+        throw new Error(`Status must be one of: ${validStatuses.join(', ')}`);
+      }
+      if (updatedByAssumptionId) {
+        validateUUID(updatedByAssumptionId, 'updatedByAssumptionId');
+      }
+    } catch (error) {
+      logger.warn('Invalid input in assumptions PATCH', { assumptionId, status, error });
+      return NextResponse.json(
+        { error: (error as Error).message },
+        { status: 400 }
+      );
+    }
+
     // Update assumption status
-    await instantRequest("/transact", {
-      method: "POST",
-      body: JSON.stringify({
-        operations: [
-          {
-            type: "update",
-            table: "profile_assumptions",
-            id: assumptionId,
-            data: {
-              status,
-              updated_by_assumption_id: updatedByAssumptionId || undefined,
-            },
-          },
-        ],
-      }),
-    });
+    const admin = getSupabaseAdmin();
+    const { error } = await admin
+      .from("cf_profile_assumptions")
+      .update({
+        status,
+        updated_by_assumption_id: updatedByAssumptionId || null,
+      })
+      .eq("id", assumptionId);
+
+    if (error) {
+      logger.error('Failed to update assumption', error, { assumptionId, status });
+      throw new Error(`Failed to update assumption: ${error.message}`);
+    }
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("Error updating assumption:", error);
+    logger.error("Error updating assumption", error);
     return NextResponse.json(
       {
         error: "Failed to update assumption",

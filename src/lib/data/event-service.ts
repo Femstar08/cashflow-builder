@@ -1,19 +1,19 @@
-import * as instantService from "@/lib/instantdb/service";
+import * as supabaseService from "@/lib/supabase/service";
 import type { Event, EventInsert, UUID } from "@/types/database";
 
 export async function listEvents(profileId: UUID): Promise<Event[]> {
-  return instantService.listEvents(profileId);
+  return supabaseService.listEvents(profileId);
 }
 
 export async function createEvent(payload: EventInsert): Promise<Event> {
-  return instantService.createEvent(payload);
+  return supabaseService.createEvent(payload);
 }
 
 export async function updateEvent(eventId: UUID, updates: Partial<Event>): Promise<Event> {
-  return instantService.updateEvent(eventId, updates);
+  return supabaseService.updateEvent(eventId, updates);
 }
 
 export async function deleteEvent(eventId: UUID): Promise<void> {
-  return instantService.deleteEvent(eventId);
+  return supabaseService.deleteEvent(eventId);
 }
 
