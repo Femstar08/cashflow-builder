@@ -46,6 +46,8 @@ export const mockProfile: BusinessProfile = {
     ],
   },
   ai_confidence: 0.82,
+  status: "active",
+  quick_questions: null,
   // Business settings fields
   entity_type: "limited_company",
   accounting_basis: "accrual",
