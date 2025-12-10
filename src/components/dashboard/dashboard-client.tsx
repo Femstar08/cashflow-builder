@@ -275,9 +275,9 @@ export function DashboardClient({ profileId }: DashboardClientProps) {
           onCancel={() => setShowSettings(false)}
         />
       )}
-      <MetricsBar lineItems={lineItems} />
+      <MetricsBar lineItems={lineItems} profile={data.profile} events={events} />
       <CashflowGrid lineItems={lineItems} onLineItemsChange={handleLineItemsChange} />
-      <CashflowChart lineItems={lineItems} />
+      <CashflowChart lineItems={lineItems} profile={data.profile} events={events} />
       <EventTree
         profileId={profileId}
         events={events}
