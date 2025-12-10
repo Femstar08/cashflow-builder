@@ -181,12 +181,13 @@ export default function HubPage() {
             {profiles.map((profile) => {
               const runway = getCashRunwayStatus(profile);
               return (
-                <Card
+                <div
                   key={profile.id}
                   className="cursor-pointer transition-shadow hover:shadow-md"
                   onClick={() => router.push(`/hub/${profile.id}`)}
                 >
-                  <div className="p-6">
+                  <Card>
+                    <div className="p-6">
                     <div className="mb-4 flex items-start justify-between">
                       <div>
                         <h3 className="text-lg font-semibold text-[#15213C]">{profile.name}</h3>
@@ -258,7 +259,8 @@ export default function HubPage() {
                       </button>
                     </div>
                   </div>
-                </Card>
+                  </Card>
+                </div>
               );
             })}
           </div>
