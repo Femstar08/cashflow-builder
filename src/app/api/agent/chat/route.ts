@@ -37,6 +37,12 @@ type AgentChatRequest = {
 };
 
 export async function POST(request: Request) {
+  // Declare variables outside try block for use in catch block
+  let profileId: string | undefined;
+  let userId: string | undefined;
+  let stage: AgentStage = "gathering";
+  let attachments: Array<{ name: string; type: string; content: string }> = [];
+
   try {
     const body: AgentChatRequest = await request.json();
     const {
@@ -44,13 +50,19 @@ export async function POST(request: Request) {
       conversationHistory = [],
       currentProfile,
       currentAssumptions,
-      stage = "gathering",
+      stage: bodyStage = "gathering",
       isInitial = false,
-      attachments = [],
-      profileId,
-      userId,
+      attachments: bodyAttachments = [],
+      profileId: bodyProfileId,
+      userId: bodyUserId,
       userRole = "client",
     } = body;
+
+    // Assign to outer scope variables
+    profileId = bodyProfileId;
+    userId = bodyUserId;
+    stage = bodyStage;
+    attachments = bodyAttachments;
 
     // Validate inputs
     if (profileId) {
