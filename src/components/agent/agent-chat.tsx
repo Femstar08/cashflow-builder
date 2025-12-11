@@ -37,7 +37,7 @@ export function AgentChat({ onProfileComplete, profileId }: AgentChatProps) {
 
   // Initialize conversation on mount (only once)
   useEffect(() => {
-    if (!hasInitialized.current && messages.length === 0) {
+    if (!hasInitialized.current && messages.length === 0 && !isProcessing) {
       hasInitialized.current = true;
       initializeConversation();
     }
@@ -52,7 +52,7 @@ export function AgentChat({ onProfileComplete, profileId }: AgentChatProps) {
   const initializeConversation = async () => {
     try {
       setProcessing(true);
-      
+
       // If profileId exists, load profile context for contextual greeting
       let profileContext = null;
       if (profileId) {
@@ -67,11 +67,11 @@ export function AgentChat({ onProfileComplete, profileId }: AgentChatProps) {
           // Continue without profile context
         }
       }
-      
+
       const response = await fetch("/api/agent/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ 
+        body: JSON.stringify({
           isInitial: true,
           profileId: profileId || undefined,
           userId: user?.id || undefined,
@@ -125,7 +125,13 @@ export function AgentChat({ onProfileComplete, profileId }: AgentChatProps) {
 
     const userMessage = inputMessage.trim();
     setInputMessage("");
-    
+
+    // Build conversation history BEFORE adding the new user message to avoid duplication
+    const conversationHistory = messages.map((msg) => ({
+      role: msg.role,
+      content: msg.content,
+    }));
+
     // Show user message or indicate files are being sent
     if (userMessage) {
       addMessage("user", userMessage);
@@ -135,12 +141,6 @@ export function AgentChat({ onProfileComplete, profileId }: AgentChatProps) {
 
     try {
       setProcessing(true);
-
-      // Build conversation history for API
-      const conversationHistory = messages.map((msg) => ({
-        role: msg.role,
-        content: msg.content,
-      }));
 
       // Convert files to base64 for transmission
       const fileDataPromises = attachedFiles.map(async (file) => {
@@ -165,7 +165,7 @@ export function AgentChat({ onProfileComplete, profileId }: AgentChatProps) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           message: userMessage,
-          conversationHistory: [...conversationHistory, { role: "user" as const, content: userMessage }],
+          conversationHistory: conversationHistory, // Don't add user message again - it's sent as 'message' field
           currentProfile,
           currentAssumptions,
           stage,
@@ -260,11 +260,10 @@ export function AgentChat({ onProfileComplete, profileId }: AgentChatProps) {
             className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}
           >
             <div
-              className={`max-w-[80%] px-4 py-3 ${
-                message.role === "user"
+              className={`max-w-[80%] px-4 py-3 ${message.role === "user"
                   ? "bg-[#53E9C5] text-[#15213C] rounded-2xl rounded-tr-sm"
                   : "bg-[#1a2a4a] text-white border border-[#5C6478]/30 rounded-2xl rounded-tl-sm"
-              }`}
+                }`}
             >
               <div className="whitespace-pre-wrap text-sm leading-relaxed">{message.content}</div>
             </div>
@@ -320,6 +319,7 @@ export function AgentChat({ onProfileComplete, profileId }: AgentChatProps) {
                 onKeyPress={handleKeyPress}
                 placeholder="Type your message..."
                 className="w-full min-h-[60px] max-h-[120px] px-4 py-2 pr-10 border border-[#5C6478]/30 rounded-lg bg-white text-[#15213C] placeholder-[#5C6478] focus:outline-none focus:ring-2 focus:ring-[#53E9C5]/50 resize-none"
+                style={{ color: '#15213C' }}
                 disabled={isProcessing}
               />
               <button
