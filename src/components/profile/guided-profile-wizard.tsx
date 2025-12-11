@@ -214,21 +214,23 @@ export function GuidedProfileWizard() {
               <label className="flex flex-col gap-2 text-sm">
                 <span className="font-semibold text-[#15213C]">Business URL (optional)</span>
                 <input
-                  className="rounded-lg border-2 border-[#5C6478]/20 bg-white px-4 py-3 text-sm outline-none transition-all focus:border-[#53E9C5] focus:ring-2 focus:ring-[#53E9C5]/20"
+                  className="rounded-lg border-2 border-[#5C6478]/20 bg-white px-4 py-3 text-sm text-[#15213C] outline-none transition-all focus:border-[#53E9C5] focus:ring-2 focus:ring-[#53E9C5]/20"
                   type="url"
                   value={formState.url}
                   onChange={(event) => updateField("url", event.target.value)}
                   placeholder="https://example.com"
+                  style={{ color: '#15213C' }}
                 />
               </label>
               <label className="flex flex-col gap-2 text-sm">
                 <span className="font-semibold text-[#15213C]">Industry Hint (optional)</span>
                 <input
-                  className="rounded-lg border-2 border-[#5C6478]/20 bg-white px-4 py-3 text-sm outline-none transition-all focus:border-[#53E9C5] focus:ring-2 focus:ring-[#53E9C5]/20"
+                  className="rounded-lg border-2 border-[#5C6478]/20 bg-white px-4 py-3 text-sm text-[#15213C] outline-none transition-all focus:border-[#53E9C5] focus:ring-2 focus:ring-[#53E9C5]/20"
                   type="text"
                   value={formState.industry}
                   onChange={(event) => updateField("industry", event.target.value)}
                   placeholder="e.g. B2B SaaS, E-commerce, Consulting"
+                  style={{ color: '#15213C' }}
                 />
               </label>
             </div>
@@ -236,10 +238,11 @@ export function GuidedProfileWizard() {
             <label className="flex flex-col gap-2 text-sm">
               <span className="font-semibold text-[#15213C]">Business Description</span>
               <textarea
-                className="min-h-[150px] rounded-xl border-2 border-[#5C6478]/20 bg-white px-4 py-3 text-sm outline-none transition-all focus:border-[#53E9C5] focus:ring-2 focus:ring-[#53E9C5]/20"
+                className="min-h-[150px] rounded-xl border-2 border-[#5C6478]/20 bg-white px-4 py-3 text-sm text-[#15213C] outline-none transition-all focus:border-[#53E9C5] focus:ring-2 focus:ring-[#53E9C5]/20"
                 value={formState.textInput}
                 onChange={(event) => updateField("textInput", event.target.value)}
                 placeholder="Tell us about your business... What do you do? Who are your customers? What's your business model?"
+                style={{ color: '#15213C' }}
               />
             </label>
 
@@ -309,19 +312,21 @@ export function GuidedProfileWizard() {
             <label className="flex flex-col gap-2 text-sm">
               <span className="font-semibold text-[#15213C]">Description</span>
               <textarea
-                className="min-h-[120px] rounded-xl border-2 border-[#5C6478]/20 bg-white px-4 py-3 text-sm outline-none transition-all focus:border-[#53E9C5] focus:ring-2 focus:ring-[#53E9C5]/20"
+                className="min-h-[120px] rounded-xl border-2 border-[#5C6478]/20 bg-white px-4 py-3 text-sm text-[#15213C] outline-none transition-all focus:border-[#53E9C5] focus:ring-2 focus:ring-[#53E9C5]/20"
                 value={formState.description}
                 onChange={(event) => updateField("description", event.target.value)}
+                style={{ color: '#15213C' }}
               />
             </label>
             
             <label className="flex flex-col gap-2 text-sm">
               <span className="font-semibold text-[#15213C]">Collaboration Notes</span>
               <textarea
-                className="min-h-[100px] rounded-xl border-2 border-[#5C6478]/20 bg-white px-4 py-3 text-sm outline-none transition-all focus:border-[#53E9C5] focus:ring-2 focus:ring-[#53E9C5]/20"
+                className="min-h-[100px] rounded-xl border-2 border-[#5C6478]/20 bg-white px-4 py-3 text-sm text-[#15213C] outline-none transition-all focus:border-[#53E9C5] focus:ring-2 focus:ring-[#53E9C5]/20"
                 placeholder="Add notes for your team or accountant..."
                 value={formState.notes}
                 onChange={(event) => updateField("notes", event.target.value)}
+                style={{ color: '#15213C' }}
               />
             </label>
 
@@ -408,10 +413,11 @@ function LabeledInput({ label, value, onChange, required }: LabeledInputProps) {
     <label className="flex flex-col gap-2 text-sm">
       <span className="font-semibold text-[#15213C]">{label}</span>
       <input
-        className="rounded-lg border-2 border-[#5C6478]/20 bg-white px-4 py-3 text-sm outline-none transition-all focus:border-[#53E9C5] focus:ring-2 focus:ring-[#53E9C5]/20"
+        className="rounded-lg border-2 border-[#5C6478]/20 bg-white px-4 py-3 text-sm text-[#15213C] outline-none transition-all focus:border-[#53E9C5] focus:ring-2 focus:ring-[#53E9C5]/20"
         value={value}
         onChange={(event) => onChange(event.target.value)}
         required={required}
+        style={{ color: '#15213C' }}
       />
     </label>
   );

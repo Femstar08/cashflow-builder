@@ -134,31 +134,34 @@ export function ProfileIntakeForm() {
           <label className="flex flex-col gap-2 text-sm">
             Business URL (optional)
             <input
-              className="rounded-lg border border-neutral-200 bg-white px-3 py-2 text-sm outline-none transition-shadow focus:border-black focus:ring-2 focus:ring-black/10 dark:border-neutral-800 dark:bg-neutral-900"
+              className="rounded-lg border border-neutral-200 bg-white px-3 py-2 text-sm text-[#15213C] outline-none transition-shadow focus:border-black focus:ring-2 focus:ring-black/10 dark:border-neutral-800 dark:bg-neutral-900 dark:text-white"
               type="url"
               value={formState.url}
               onChange={(event) => updateField("url", event.target.value)}
               placeholder="https://example.com"
+              style={{ color: '#15213C' }}
             />
           </label>
           <label className="flex flex-col gap-2 text-sm">
             Optional hint
             <input
-              className="rounded-lg border border-neutral-200 bg-white px-3 py-2 text-sm outline-none transition-shadow focus:border-black focus:ring-2 focus:ring-black/10 dark:border-neutral-800 dark:bg-neutral-900"
+              className="rounded-lg border border-neutral-200 bg-white px-3 py-2 text-sm text-[#15213C] outline-none transition-shadow focus:border-black focus:ring-2 focus:ring-black/10 dark:border-neutral-800 dark:bg-neutral-900 dark:text-white"
               type="text"
               value={formState.industry}
               onChange={(event) => updateField("industry", event.target.value)}
               placeholder="e.g. B2B SaaS"
+              style={{ color: '#15213C' }}
             />
           </label>
         </div>
         <label className="mt-4 flex flex-col gap-2 text-sm">
           Business information (optional)
           <textarea
-            className="min-h-[120px] rounded-xl border border-neutral-200 bg-white px-3 py-2 text-sm outline-none transition-shadow focus:border-black focus:ring-2 focus:ring-black/10 dark:border-neutral-800 dark:bg-neutral-900"
+            className="min-h-[120px] rounded-xl border border-neutral-200 bg-white px-3 py-2 text-sm text-[#15213C] outline-none transition-shadow focus:border-black focus:ring-2 focus:ring-black/10 dark:border-neutral-800 dark:bg-neutral-900 dark:text-white"
             value={formState.textInput}
             onChange={(event) => updateField("textInput", event.target.value)}
             placeholder="Paste or type business information, company description, website content, or any relevant details..."
+            style={{ color: '#15213C' }}
           />
         </label>
         {message && (
@@ -195,18 +198,20 @@ export function ProfileIntakeForm() {
             <label className="mt-4 flex flex-col gap-2 text-sm">
               Description
               <textarea
-                className="min-h-[120px] rounded-xl border border-neutral-200 bg-white px-3 py-2 text-sm outline-none transition-shadow focus:border-black focus:ring-2 focus:ring-black/10 dark:border-neutral-800 dark:bg-neutral-900"
+                className="min-h-[120px] rounded-xl border border-neutral-200 bg-white px-3 py-2 text-sm text-[#15213C] outline-none transition-shadow focus:border-black focus:ring-2 focus:ring-black/10 dark:border-neutral-800 dark:bg-neutral-900 dark:text-white"
                 value={formState.description}
                 onChange={(event) => updateField("description", event.target.value)}
+                style={{ color: '#15213C' }}
               />
             </label>
             <label className="mt-4 flex flex-col gap-2 text-sm">
               Collaboration notes (visible to your team)
               <textarea
-                className="min-h-[120px] rounded-xl border border-neutral-200 bg-white px-3 py-2 text-sm outline-none transition-shadow focus:border-black focus:ring-2 focus:ring-black/10 dark:border-neutral-800 dark:bg-neutral-900"
+                className="min-h-[120px] rounded-xl border border-neutral-200 bg-white px-3 py-2 text-sm text-[#15213C] outline-none transition-shadow focus:border-black focus:ring-2 focus:ring-black/10 dark:border-neutral-800 dark:bg-neutral-900 dark:text-white"
                 placeholder="Add context for your accountant or client..."
                 value={formState.notes}
                 onChange={(event) => updateField("notes", event.target.value)}
+                style={{ color: '#15213C' }}
               />
             </label>
           </Card>
@@ -238,10 +243,11 @@ function LabeledInput({ label, value, onChange, required }: LabeledInputProps) {
     <label className="flex flex-col gap-2 text-sm">
       {label}
       <input
-        className="rounded-lg border border-neutral-200 bg-white px-3 py-2 text-sm outline-none transition-shadow focus:border-black focus:ring-2 focus:ring-black/10 dark:border-neutral-800 dark:bg-neutral-900"
+        className="rounded-lg border border-neutral-200 bg-white px-3 py-2 text-sm text-[#15213C] outline-none transition-shadow focus:border-black focus:ring-2 focus:ring-black/10 dark:border-neutral-800 dark:bg-neutral-900 dark:text-white"
         value={value}
         onChange={(event) => onChange(event.target.value)}
         required={required}
+        style={{ color: '#15213C' }}
       />
     </label>
   );
