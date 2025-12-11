@@ -251,8 +251,16 @@ export async function POST(request: Request) {
     messages.push({ role: "system", content: systemPrompt });
 
     // Add conversation history (last 10 messages to avoid token limits)
+    // Note: conversationHistory may include the current user message for context
     const recentHistory = conversationHistory.slice(-10);
-    for (const msg of recentHistory) {
+    const lastHistoryMessage = recentHistory.length > 0 ? recentHistory[recentHistory.length - 1] : null;
+    const currentMessageMatchesHistory = lastHistoryMessage && 
+      lastHistoryMessage.role === "user" && 
+      lastHistoryMessage.content === message;
+    
+    // Add conversation history, but skip the last message if it matches the current message (to avoid duplication)
+    const historyToAdd = currentMessageMatchesHistory ? recentHistory.slice(0, -1) : recentHistory;
+    for (const msg of historyToAdd) {
       messages.push({ role: msg.role, content: msg.content });
     }
 

@@ -42,7 +42,7 @@ export function AgentChat({ onProfileComplete, profileId }: AgentChatProps) {
       initializeConversation();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [profileId]);
+  }, [profileId, isProcessing]);
 
   // Scroll to bottom when new messages arrive
   useEffect(() => {
@@ -126,12 +126,6 @@ export function AgentChat({ onProfileComplete, profileId }: AgentChatProps) {
     const userMessage = inputMessage.trim();
     setInputMessage("");
 
-    // Build conversation history BEFORE adding the new user message to avoid duplication
-    const conversationHistory = messages.map((msg) => ({
-      role: msg.role,
-      content: msg.content,
-    }));
-
     // Show user message or indicate files are being sent
     if (userMessage) {
       addMessage("user", userMessage);
@@ -141,6 +135,13 @@ export function AgentChat({ onProfileComplete, profileId }: AgentChatProps) {
 
     try {
       setProcessing(true);
+
+      // Build conversation history including the current user message for full context
+      // The API will use conversationHistory for context and message for the current turn
+      const conversationHistory = messages.map((msg) => ({
+        role: msg.role,
+        content: msg.content,
+      }));
 
       // Convert files to base64 for transmission
       const fileDataPromises = attachedFiles.map(async (file) => {
@@ -165,7 +166,7 @@ export function AgentChat({ onProfileComplete, profileId }: AgentChatProps) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           message: userMessage,
-          conversationHistory: conversationHistory, // Don't add user message again - it's sent as 'message' field
+          conversationHistory: conversationHistory, // Includes all messages including the current user message
           currentProfile,
           currentAssumptions,
           stage,
