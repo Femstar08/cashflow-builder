@@ -50,10 +50,13 @@ export async function saveProfileDraft(payload: SaveInput) {
     return { data: { ...payload, id: "mock-id" }, simulated: true };
   }
 
+  // Extract simulate from payload to avoid passing it to the database
+  const { simulate, ...profileData } = payload;
+
   const data = await createProfile({
-    raw_profile_json: payload.raw_profile_json ?? {},
-    notes: payload.notes ?? null,
-    ...payload,
+    raw_profile_json: profileData.raw_profile_json ?? {},
+    notes: profileData.notes ?? null,
+    ...profileData,
   });
 
   return { data, simulated: false };
